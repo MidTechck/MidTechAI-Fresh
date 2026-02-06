@@ -1,95 +1,159 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>MidTech AI</title>
+    <title>MidTechAI Assistant</title>
     <style>
         body{
             margin:0;
-            font-family: Arial, Helvetica, sans-serif;
-            background:#0f0f0f;
+            font-family: 'Segoe UI', sans-serif;
+            background:#0a0a0f;
             color:white;
             display:flex;
             flex-direction:column;
             height:100vh;
+            overflow:hidden;
         }
+
+        header{
+            padding:15px;
+            text-align:center;
+            font-size:28px;
+            background: linear-gradient(90deg,#0ff,#8a2be2);
+        }
+
         #chat{
             flex:1;
             padding:20px;
             overflow-y:auto;
         }
+
         .msg{
             margin:10px 0;
-            padding:12px 16px;
-            border-radius:10px;
+            padding:12px 18px;
+            border-radius:16px;
             max-width:70%;
+            animation:fadeIn .4s ease;
         }
-        .user{background:#2c2c2c; align-self:flex-end;}
-        .ai{background:#1a1a1a; align-self:flex-start;}
-        #input-area{
+
+        .user{
+            background:#1f1f1f;
+            margin-left:auto;
+            border:1px solid #0ff;
+        }
+
+        .ai{
+            background:linear-gradient(90deg,#0ff,#8a2be2);
+        }
+
+        @keyframes fadeIn{
+            from{opacity:0; transform:scale(.9);}
+            to{opacity:1; transform:scale(1);}
+        }
+
+        #typing{
+            display:flex;
+            margin:10px;
+        }
+
+        .dot{
+            height:10px;
+            width:10px;
+            margin:0 4px;
+            background:#0ff;
+            border-radius:50%;
+            display:inline-block;
+            animation:bounce 1.2s infinite;
+        }
+
+        .dot:nth-child(2){animation-delay:.2s;}
+        .dot:nth-child(3){animation-delay:.4s;}
+
+        @keyframes bounce{
+            0%,100%{transform:translateY(0);}
+            50%{transform:translateY(-8px);}
+        }
+
+        #inputArea{
             display:flex;
             padding:15px;
-            background:#1c1c1c;
+            background:#0a0a0f;
         }
+
         input{
             flex:1;
             padding:12px;
+            border-radius:10px;
             border:none;
-            outline:none;
-            background:#2a2a2a;
+            background:#2b2b2b;
             color:white;
-            border-radius:8px;
+            outline:none;
         }
+
         button{
             margin-left:10px;
             padding:12px 18px;
             border:none;
-            background:#444;
-            color:white;
-            border-radius:8px;
+            border-radius:10px;
+            background:#0ff;
             cursor:pointer;
         }
     </style>
 </head>
 <body>
 
+<header>MidTechAI Assistant</header>
+
 <div id="chat"></div>
 
-<div id="input-area">
-    <input id="msg" placeholder="Ask me anything..." />
+<div id="typing" style="display:none;">
+    <span class="dot"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+</div>
+
+<div id="inputArea">
+    <input id="msg" placeholder="Ask me anything..."/>
     <button onclick="send()">Send</button>
 </div>
 
 <script>
-function addMessage(text, cls){
-    const div=document.createElement("div");
+function addMessage(text,cls){
+    let div=document.createElement("div");
     div.className="msg "+cls;
     div.innerText=text;
     document.getElementById("chat").appendChild(div);
-    div.scrollIntoView();
+    div.scrollIntoView({behavior:"smooth"});
 }
+
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
 async function send(){
     const input=document.getElementById("msg");
-    const message=input.value;
-    if(!message) return;
-
-    addMessage(message,"user");
+    const msg=input.value.trim();
+    if(!msg) return;
+    addMessage(msg,"user");
     input.value="";
 
-    addMessage("Typing...","ai");
+    const typingDiv=document.getElementById("typing");
+    typingDiv.style.display="flex";
 
-    const res=await fetch("/chat",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({message:message})
-    });
+    // Wait 1.2s animation before showing AI
+    await sleep(1200);
 
-    const data=await res.json();
-    document.querySelectorAll(".ai").forEach(e=>{
-        if(e.innerText==="Typing...") e.remove();
-    });
+    // Remove typing dots
+    typingDiv.style.display="none";
 
-    addMessage(data.reply,"ai");
+    try{
+        const res=await fetch("/chat",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({message:msg})
+        });
+        const data=await res.json();
+        addMessage(data.reply,"ai");
+    }catch(err){
+        addMessage("Error: Unable to fetch response.","ai");
+    }
 }
 </script>
 
