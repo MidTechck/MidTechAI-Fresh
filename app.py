@@ -22,17 +22,24 @@ def offline_brain(user_input):
     # TIME & DATE
     if contains(text, ["time"]):
         return f"The current time is {datetime.now().strftime('%H:%M:%S')}"
-
     if contains(text, ["day", "date", "month", "year"]):
         return f"Today is {datetime.now().strftime('%A, %d %B %Y')}"
 
-    # CREATOR
+    # CREATOR / OWNER
     if contains(text, ["creator", "created", "made you", "built you", "owner", "who made"]):
         return random.choice([
             "I was created by Charles Kanyama, the mind behind MidTech.",
             "Charles Kanyama is my creator. I'm part of his MidTech vision.",
             "My creator is Charles Kanyama. He designed me to be smart and helpful."
         ])
+
+    # CREATOR FAVORITES
+    if contains(text, ["favorite color", "color do you like", "fav color"]):
+        return "Charles's favorite color is black."
+    if contains(text, ["favorite game", "game he likes"]):
+        return "Charles's favorite games are Minecraft and eFootball."
+    if contains(text, ["favorite sport", "sport he likes"]):
+        return "Charles's favorite sport is soccer, and his favorite team is Chelsea."
 
     # BOT NAME
     if contains(text, ["your name", "who are you", "what are you"]):
@@ -49,7 +56,6 @@ def offline_brain(user_input):
             "That sounds tough. Try to relax a bit and give yourself some kindness.",
             "I hope you feel better soon. Don’t forget to hydrate and rest."
         ])
-
     if contains(text, ["happy", "great", "good", "fine"]):
         return random.choice([
             "That’s wonderful to hear! Keep the positive energy going.",
@@ -85,12 +91,12 @@ def offline_brain(user_input):
 # ===== ONLINE BRAIN =====
 def online_brain(user_input):
     try:
-        # First try Wikipedia
+        # Wikipedia first
         wikipedia.set_lang("en")
         summary = wikipedia.summary(user_input, sentences=2)
         return f"From Wikipedia: {summary}"
-    except Exception as e:
-        # If Wikipedia fails, fallback to DuckDuckGo search snippet
+    except:
+        # Fallback DuckDuckGo
         try:
             url = f"https://api.duckduckgo.com/?q={user_input}&format=json&no_redirect=1"
             response = requests.get(url).json()
@@ -116,7 +122,7 @@ def chat():
     # Offline first
     reply = offline_brain(user_message)
 
-    # If offline doesn't know, go online
+    # Online fallback if offline doesn't know
     if not reply:
         reply = online_brain(user_message)
 
