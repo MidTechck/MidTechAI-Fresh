@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import requests
-import math
 import random
 import re
 
@@ -10,9 +9,8 @@ app = Flask(__name__)
 # =========================
 # Identity & Creator Memory
 # =========================
-AI_IDENTITY = {
+AI = {
     "name": "MidTechAI",
-    "role": "intelligent assistant",
     "creator": "Charles",
     "country": "Zambia",
     "favorite_color": "black",
@@ -21,131 +19,105 @@ AI_IDENTITY = {
     "favorite_team": "Chelsea"
 }
 
-conversation_memory = []
+# =========================
+# Conversation Memory
+# =========================
+memory = {
+    "user_name": None,
+    "history": []
+}
 
 # =========================
-# Helper functions
+# Offline Knowledge Base
 # =========================
-def contains_any(text, words):
+offline_knowledge = {
+    "python": "Python is a powerful programming language used for web, AI, automation and more.",
+    "html": "HTML is used to structure content on the web.",
+    "css": "CSS styles and designs web pages.",
+    "javascript": "JavaScript makes websites interactive.",
+    "zambia": "Zambia is a country in Southern Africa, known for Victoria Falls.",
+    "ai": "Artificial Intelligence allows machines to simulate human intelligence.",
+    "flask": "Flask is a lightweight Python web framework.",
+    "github": "GitHub is a platform for hosting and collaborating on code.",
+}
+
+# =========================
+# Helper Functions
+# =========================
+def say_random(options):
+    return random.choice(options)
+
+def contains(text, words):
     return any(word in text for word in words)
 
-def random_choice(list_items):
-    return random.choice(list_items)
-
 # =========================
-# Human‑like responses
+# Human Responses
 # =========================
-greetings = [
-    "Hey there! How can I help you today?",
-    "Hello! What’s on your mind?",
-    "Hi! Nice to talk to you."
-]
+greetings = ["Hello! How can I help you?", "Hi there!", "Hey! What’s up?"]
+farewells = ["Goodbye!", "See you later!", "Bye!"]
 
-farewells = [
-    "Goodbye! Take care!",
-    "See you later!",
-    "Bye! Come back anytime."
-]
-
-comfort_happy = [
-    "That’s wonderful to hear! Keep that positive energy.",
-    "Happiness looks good on you 😊",
-    "I’m glad you’re feeling great!"
-]
-
-comfort_sad = [
-    "I’m really sorry you feel that way. I’m here for you.",
-    "Tough days happen. Don’t be too hard on yourself.",
-    "Sending you some virtual support. You’re not alone."
-]
-
-comfort_tired = [
-    "You should get some rest. Your body deserves it.",
-    "Slow down a little and recharge.",
-    "A short break can make a big difference."
-]
-
-comfort_sick = [
-    "Please take care of yourself and rest well.",
-    "Drink water and don’t stress yourself.",
-    "Hope you recover very soon."
-]
+happy = ["That’s great to hear!", "I love the positive energy!", "Nice! Keep smiling."]
+sad = ["I’m here for you.", "Sorry you feel that way.", "Things will get better."]
+tired = ["You should rest a bit.", "Take a short break.", "Relax and recharge."]
+sick = ["Please rest and drink water.", "Hope you recover soon.", "Take care of yourself."]
 
 jokes = [
-    "Why do programmers love dark mode? Because light attracts bugs! 😂",
-    "Why did the computer catch a cold? It left its Windows open!",
-    "Why was the math book sad? It had too many problems."
-]
-
-advice = [
-    "Keep learning. Small progress every day matters.",
-    "Take care of your mind and body.",
-    "Stay curious. Curiosity builds intelligence."
+    "Why do programmers love dark mode? Because light attracts bugs!",
+    "Why did the computer get cold? It forgot to close its Windows!",
 ]
 
 # =========================
-# Recognition Logic
+# Identity Recognition
 # =========================
-def handle_identity_questions(msg):
-    if contains_any(msg, ["your name", "who are you", "what are you"]):
-        return random_choice([
-            f"I am {AI_IDENTITY['name']}, your {AI_IDENTITY['role']}.",
-            f"My name is {AI_IDENTITY['name']}. I assist, chat, and help with information.",
-            f"I’m {AI_IDENTITY['name']}, built to think and assist you."
-        ])
-
-    if contains_any(msg, ["who created you", "who made you", "who built you",
-                          "who designed you", "your creator", "your maker"]):
-        return random_choice([
-            f"I was created by {AI_IDENTITY['creator']}.",
-            f"{AI_IDENTITY['creator']} is the mastermind behind me.",
-            f"My creator is {AI_IDENTITY['creator']}, from {AI_IDENTITY['country']}."
-        ])
-
-    if contains_any(msg, ["favorite color", "favourite color"]):
-        return f"My creator’s favorite color is {AI_IDENTITY['favorite_color']}."
-
-    if contains_any(msg, ["favorite game", "games you like"]):
-        games = ", ".join(AI_IDENTITY['favorite_games'])
-        return f"{AI_IDENTITY['creator']} enjoys playing {games}."
-
-    if contains_any(msg, ["favorite sport"]):
-        return f"{AI_IDENTITY['creator']} loves {AI_IDENTITY['favorite_sport']}."
-
-    if contains_any(msg, ["favorite team", "football team"]):
-        return f"{AI_IDENTITY['creator']}'s favorite team is {AI_IDENTITY['favorite_team']}."
-
+def identity_answers(msg):
+    if contains(msg, ["your name", "who are you"]):
+        return f"I am {AI['name']}."
+    if contains(msg, ["who created you", "who made you", "your creator"]):
+        return f"I was created by {AI['creator']} from {AI['country']}."
+    if "favorite color" in msg:
+        return f"My creator's favorite color is {AI['favorite_color']}."
+    if "favorite game" in msg:
+        return f"He enjoys {', '.join(AI['favorite_games'])}."
+    if "favorite sport" in msg:
+        return f"He loves {AI['favorite_sport']}."
+    if "favorite team" in msg:
+        return f"His favorite team is {AI['favorite_team']}."
     return None
 
 # =========================
-# Emotion & chat logic
+# Emotion Detection
 # =========================
-def handle_emotions(msg):
-    if contains_any(msg, ["happy", "great", "good mood"]):
-        return random_choice(comfort_happy)
-    if contains_any(msg, ["sad", "unhappy", "depressed"]):
-        return random_choice(comfort_sad)
-    if contains_any(msg, ["tired", "exhausted"]):
-        return random_choice(comfort_tired)
-    if contains_any(msg, ["sick", "ill"]):
-        return random_choice(comfort_sick)
+def emotion_reply(msg):
+    if contains(msg, ["happy", "good", "great"]):
+        return say_random(happy)
+    if contains(msg, ["sad", "down"]):
+        return say_random(sad)
+    if contains(msg, ["tired", "exhausted"]):
+        return say_random(tired)
+    if contains(msg, ["sick", "ill"]):
+        return say_random(sick)
     return None
 
 # =========================
-# Utilities
+# Offline Answer
 # =========================
-def get_time_info():
-    now = datetime.now()
-    return now.strftime("Today is %A, %B %d, %Y and the time is %H:%M:%S.")
+def offline_answer(msg):
+    for key in offline_knowledge:
+        if key in msg:
+            return offline_knowledge[key]
+    return None
 
-def search_wikipedia(query):
+# =========================
+# Online Wikipedia
+# =========================
+def online_search(query):
     try:
         url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=4)
         data = r.json()
-        return data.get("extract", "I couldn't find information on that.")
+        return data.get("extract")
     except:
-        return "I couldn't fetch information right now."
+        return None
 
 # =========================
 # Routes
@@ -157,48 +129,51 @@ def home():
 @app.route("/chat", methods=["POST"])
 def chat():
     msg = request.json.get("message", "").lower()
-    conversation_memory.append(msg)
+    memory["history"].append(msg)
 
-    # Greetings & farewells
-    if contains_any(msg, ["hello", "hi", "hey"]):
-        return jsonify({"reply": random_choice(greetings)})
-    if contains_any(msg, ["bye", "goodbye"]):
-        return jsonify({"reply": random_choice(farewells)})
+    # Learn user name
+    if "my name is" in msg:
+        name = msg.split("my name is")[-1].strip().title()
+        memory["user_name"] = name
+        return jsonify({"reply": f"Nice to meet you, {name}!"})
 
-    # Identity & creator recognition
-    identity_reply = handle_identity_questions(msg)
-    if identity_reply:
-        return jsonify({"reply": identity_reply})
+    # Greetings
+    if contains(msg, ["hello", "hi", "hey"]):
+        return jsonify({"reply": say_random(greetings)})
+
+    # Identity
+    identity = identity_answers(msg)
+    if identity:
+        return jsonify({"reply": identity})
 
     # Emotions
-    emotion_reply = handle_emotions(msg)
-    if emotion_reply:
-        return jsonify({"reply": emotion_reply})
+    emo = emotion_reply(msg)
+    if emo:
+        return jsonify({"reply": emo})
 
     # Jokes
-    if "joke" in msg or "make me laugh" in msg:
-        return jsonify({"reply": random_choice(jokes)})
-
-    # Advice
-    if "advice" in msg:
-        return jsonify({"reply": random_choice(advice)})
-
-    # Time/date
-    if "time" in msg or "date" in msg:
-        return jsonify({"reply": get_time_info()})
+    if "joke" in msg:
+        return jsonify({"reply": say_random(jokes)})
 
     # Math
     try:
         if re.search(r'[\d\+\-\*\/\^\.]+', msg):
-            expr = msg.replace("^", "**")
-            result = eval(expr)
+            result = eval(msg.replace("^", "**"))
             return jsonify({"reply": f"The result is {result}"})
     except:
         pass
 
-    # Fallback online search
-    info = search_wikipedia(msg.replace(" ", "_"))
-    return jsonify({"reply": info})
+    # Offline knowledge first
+    off = offline_answer(msg)
+    if off:
+        return jsonify({"reply": off})
+
+    # Online search fallback
+    online = online_search(msg.replace(" ", "_"))
+    if online:
+        return jsonify({"reply": online})
+
+    return jsonify({"reply": "I’m not sure about that yet, but I’m learning more every day!"})
 
 
 if __name__ == "__main__":
