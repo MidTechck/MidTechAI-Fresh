@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MidTechAI Assistant</title>
+<style>
+body{
+    margin:0;
+    font-family:Segoe UI;
+    background:#0a0a0f;
+    color:white;
+    overflow:hidden;
+}
+header{
+    padding:15px;
+    text-align:center;
+    font-size:28px;
+    background:linear-gradient(90deg,#0ff,#8a2be2);
+}
+#chat{
+    height:75vh;
+    overflow-y:auto;
+    padding:20px;
+}
+.message{
+    margin:10px 0;
+    padding:12px 18px;
+    border-radius:16px;
+    max-width:70%;
+    animation:fadeIn .4s ease;
+}
+.user{
+    background:#1f1f1f;
+    margin-left:auto;
+    border:1px solid #0ff;
+}
+.ai{
+    background:linear-gradient(90deg,#0ff,#8a2be2);
+}
+@keyframes fadeIn{
+    from{opacity:0;transform:scale(.9);}
+    to{opacity:1;transform:scale(1);}
+}
+#typing{
+    display:none;
+    margin:10px;
+}
+.dot{
+    height:8px;width:8px;
+    margin:0 3px;
+    background:#0ff;
+    border-radius:50%;
+    display:inline-block;
+    animation:bounce 1.2s infinite;
+}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce{
+    0%,100%{transform:translateY(0)}
+    50%{transform:translateY(-6px)}
+}
+#inputArea{
+    position:fixed;
+    bottom:0;
+    width:100%;
+    padding:15px;
+    background:#0a0a0f;
+    display:flex;
+}
+input{
+    flex:1;
+    padding:12px;
+    border-radius:10px;
+    border:none;
+    background:#2b2b2b;
+    color:white;
+}
+button{
+    margin-left:10px;
+    padding:12px 18px;
+    border:none;
+    border-radius:10px;
+    background:#0ff;
+    cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<header>MidTechAI Assistant</header>
+
+<div id="chat"></div>
+
+<div id="typing">
+    <span class="dot"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+</div>
+
+<div id="inputArea">
+    <input id="msg" placeholder="Type your question...">
+    <button onclick="send()">Send</button>
+</div>
+
+<script>
+function addMessage(text,cls){
+    let div=document.createElement("div");
+    div.className="message "+cls;
+    div.innerText=text;
+    document.getElementById("chat").appendChild(div);
+    div.scrollIntoView();
+}
+
+function send(){
+    let msg=document.getElementById("msg").value;
+    if(!msg) return;
+    addMessage(msg,"user");
+    document.getElementById("msg").value="";
+    document.getElementById("typing").style.display="block";
+
+    fetch("/ask",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({message:msg})
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        document.getElementById("typing").style.display="none";
+        addMessage(data.reply,"ai");
+    });
+}
+</script>
+
+</body>
+</html>
