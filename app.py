@@ -9,6 +9,18 @@ app = Flask(__name__)
 conversation_memory = []
 
 # ====================
+# Creator info (real favorites)
+# ====================
+creator_info = {
+    "name": "Charles",
+    "favorite_color": "black",
+    "favorite_game": ["Minecraft", "eFootball"],
+    "favorite_sport": "soccer",
+    "favorite_team": "Chelsea",
+    "country": "Zambia"
+}
+
+# ====================
 # Offline responses
 # ====================
 offline_responses = {
@@ -25,21 +37,11 @@ offline_responses = {
     "thanks": ["You're welcome! 😊", "No problem!", "Anytime!"],
     "thank you": ["No problem!", "You're welcome!", "Happy to help!"],
 
-    # Creator / Name
-    "who created you": [
-        "I was created by Charles, your tech genius.",
-        "Charles made me with care and code.",
-        "I am the creation of Charles!"
-    ],
+    # Name
     "your name": [
         "I am MidTechAI, your personal assistant.",
         "You can call me MidTechAI.",
         "MidTechAI at your service!"
-    ],
-    "who made you": [
-        "Charles is the mastermind behind me.",
-        "I was brought to life by Charles.",
-        "Charles built me using Python and some AI magic."
     ],
 
     # General purpose
@@ -102,6 +104,22 @@ offline_responses = {
         "Stay curious and keep asking questions!"
     ]
 }
+
+# ====================
+# Creator question variations
+# ====================
+creator_questions = [
+    "who created you", "who is your creator", "who made you",
+    "who built you", "who designed you", "who is your maker", "who is your father"
+]
+
+for q in creator_questions:
+    offline_responses[q] = [
+        f"I was created by {creator_info['name']}, your tech genius.",
+        f"{creator_info['name']} made me with care and code.",
+        f"My creator is {creator_info['name']}, who loves {creator_info['favorite_color']} and enjoys {random.choice(creator_info['favorite_game'])}.",
+        f"{creator_info['name']} is from {creator_info['country']} and loves {creator_info['favorite_sport']}, supporting {creator_info['favorite_team']}!"
+    ]
 
 # Trivia / offline knowledge
 trivia = {
@@ -189,4 +207,3 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
