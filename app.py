@@ -1,22 +1,21 @@
 from flask import Flask, request, jsonify, render_template
 import random
 from datetime import datetime
-from openai import OpenAI
-import os
+import wikipedia
+import requests
 
 app = Flask(__name__)
 
-# ===== OpenAI Client =====
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ===== MEMORY =====
+memory = []
 
-# ===== Helpers =====
+# ===== OFFLINE BRAIN =====
 def normalize(text):
     return text.lower().strip()
 
 def contains(text, words):
     return any(word in text for word in words)
 
-# ===== OFFLINE BRAIN =====
 def offline_brain(user_input):
     text = normalize(user_input)
 
@@ -84,18 +83,23 @@ def offline_brain(user_input):
     return None
 
 # ===== ONLINE BRAIN =====
-def online_brain(user_message):
+def online_brain(user_input):
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a smart AI assistant that gives clear and helpful answers."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        return response.choices[0].message.content
+        # First try Wikipedia
+        wikipedia.set_lang("en")
+        summary = wikipedia.summary(user_input, sentences=2)
+        return f"From Wikipedia: {summary}"
     except Exception as e:
-        return f"Online error: {str(e)}"
+        # If Wikipedia fails, fallback to DuckDuckGo search snippet
+        try:
+            url = f"https://api.duckduckgo.com/?q={user_input}&format=json&no_redirect=1"
+            response = requests.get(url).json()
+            abstract = response.get("AbstractText", "")
+            if abstract:
+                return f"From DuckDuckGo: {abstract}"
+        except:
+            pass
+    return "I’m still learning about that. I’ll find out more next time!"
 
 # ===== ROUTES =====
 @app.route("/")
@@ -106,14 +110,19 @@ def home():
 def chat():
     user_message = request.json["message"]
 
-    # Try offline first
+    # Save user message in memory
+    memory.append({"role": "user", "content": user_message})
+
+    # Offline first
     reply = offline_brain(user_message)
 
-    if reply:
-        return jsonify({"reply": reply})
+    # If offline doesn't know, go online
+    if not reply:
+        reply = online_brain(user_message)
 
-    # Else go online
-    reply = online_brain(user_message)
+    # Save bot reply in memory
+    memory.append({"role": "bot", "content": reply})
+
     return jsonify({"reply": reply})
 
 if __name__ == "__main__":

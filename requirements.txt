@@ -1,4 +1,4 @@
 flask
 gunicorn
+wikipedia
 requests
-openai
