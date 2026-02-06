@@ -11,7 +11,6 @@
             display:flex;
             flex-direction:column;
             height:100vh;
-            overflow:hidden;
         }
 
         header{
@@ -76,7 +75,7 @@
         #inputArea{
             display:flex;
             padding:15px;
-            background:#0a0a0f;
+            background:#1a1a1a;
         }
 
         input{
@@ -134,13 +133,14 @@ async function send(){
     addMessage(msg,"user");
     input.value="";
 
+    // Show typing animation
     const typingDiv=document.getElementById("typing");
     typingDiv.style.display="flex";
 
-    // Wait 1.2s animation before showing AI
+    // Wait 1.2s animation
     await sleep(1200);
 
-    // Remove typing dots
+    // Hide typing dots
     typingDiv.style.display="none";
 
     try{
