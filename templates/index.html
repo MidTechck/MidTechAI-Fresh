@@ -74,10 +74,10 @@
             height:10px;
             width:10px;
             margin:0 4px;
-            background:#0ff;
             border-radius:50%;
             display:inline-block;
-            animation:bounce 1.2s infinite;
+            animation:bounce 1.2s infinite, glow 1.2s infinite;
+            background:#0ff;
         }
 
         .dot:nth-child(2){animation-delay:.2s;}
@@ -86,6 +86,47 @@
         @keyframes bounce{
             0%,100%{transform:translateY(0);}
             50%{transform:translateY(-8px);}
+        }
+
+        @keyframes glow{
+            0%,100%{box-shadow:0 0 2px #0ff;}
+            50%{box-shadow:0 0 10px #0ff;}
+        }
+
+        /* Light mode overrides */
+        body.light{
+            background:#f4f4f4;
+            color:#111;
+        }
+
+        body.light input{
+            background:#e0e0e0;
+            color:#111;
+        }
+
+        body.light .user{
+            background:#d3d3d3;
+            color:#111;
+            border:1px solid #0ff;
+        }
+
+        body.light .ai{
+            background:linear-gradient(90deg,#0ff,#8a2be2);
+            color:#000;
+        }
+
+        body.light #inputArea{
+            background:#e5e5e5;
+        }
+
+        body.light .dot{
+            background:#0077cc;
+            animation-name: bounce, glowLight;
+        }
+
+        @keyframes glowLight{
+            0%,100%{box-shadow:0 0 2px #0077cc;}
+            50%{box-shadow:0 0 8px #0077cc;}
         }
 
         #inputArea{
@@ -113,31 +154,6 @@
             cursor:pointer;
         }
 
-        /* Light mode */
-        body.light{
-            background:#f4f4f4;
-            color:#111;
-        }
-
-        body.light input{
-            background:#e0e0e0;
-            color:#111;
-        }
-
-        body.light .user{
-            background:#d3d3d3;
-            color:#111;
-            border:1px solid #0ff;
-        }
-
-        body.light .ai{
-            background:linear-gradient(90deg,#0ff,#8a2be2);
-            color:#000;
-        }
-
-        body.light #inputArea{
-            background:#e5e5e5;
-        }
     </style>
 </head>
 <body>
@@ -181,8 +197,7 @@ async function send(){
     const typingDiv=document.getElementById("typing");
     typingDiv.style.display="flex";
 
-    // Typing animation 1.2s
-    await sleep(1200);
+    await sleep(1200); // 1.2s typing animation
 
     typingDiv.style.display="none";
 
