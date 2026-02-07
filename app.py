@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import random
 import requests
 
+# Initialize Flask app
 app = Flask(__name__)
 
 # -----------------------
@@ -127,17 +128,17 @@ def home():
 def chat():
     user_message = request.get_json().get("message", "")
     
-    # First, try offline memory
+    # Offline memory first
     reply = get_offline_reply(user_message)
     if reply:
         return jsonify({"reply": reply})
 
-    # Next, try online fetch (Wikipedia)
+    # Online fetch fallback
     online_reply = fetch_online_info(user_message)
     if online_reply:
         return jsonify({"reply": online_reply})
 
-    # Fallback
+    # Final fallback
     return jsonify({"reply": "I’m not sure about that yet, but I’m learning more every day!"})
 
 # -----------------------
