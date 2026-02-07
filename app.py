@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify
 import random
 import requests
 
-# Initialize Flask app
 app = Flask(__name__)
 
 # -----------------------
@@ -97,14 +96,11 @@ def get_offline_reply(message):
     if "favorite team" in message:
         return f"My creator supports {OWNER_INFO['favorite_team']}."
 
-    if "who is your creator" in message or "who made you" in message:
-        return f"My creator is {OWNER_INFO['name']}."
-
     return None
 
-def fetch_online_info(query):
+def fetch_wikipedia(query):
     """
-    Fetch simple summary from Wikipedia using its API.
+    Fetch a summary from Wikipedia API.
     """
     try:
         url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
@@ -113,6 +109,21 @@ def fetch_online_info(query):
             data = response.json()
             if "extract" in data:
                 return data["extract"]
+        return None
+    except:
+        return None
+
+def fetch_duckduckgo(query):
+    """
+    Fetch a short summary from DuckDuckGo Instant Answer API.
+    """
+    try:
+        url = f"https://api.duckduckgo.com/?q={query}&format=json&no_redirect=1&skip_disambig=1"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("AbstractText"):
+                return data["AbstractText"]
         return None
     except:
         return None
@@ -128,17 +139,22 @@ def home():
 def chat():
     user_message = request.get_json().get("message", "")
     
-    # Offline memory first
+    # 1️⃣ Offline memory first
     reply = get_offline_reply(user_message)
     if reply:
         return jsonify({"reply": reply})
 
-    # Online fetch fallback
-    online_reply = fetch_online_info(user_message)
-    if online_reply:
-        return jsonify({"reply": online_reply})
+    # 2️⃣ Wikipedia summary
+    wiki_reply = fetch_wikipedia(user_message)
+    if wiki_reply:
+        return jsonify({"reply": wiki_reply})
 
-    # Final fallback
+    # 3️⃣ DuckDuckGo Instant Answer
+    ddg_reply = fetch_duckduckgo(user_message)
+    if ddg_reply:
+        return jsonify({"reply": ddg_reply})
+
+    # 4️⃣ Final fallback
     return jsonify({"reply": "I’m not sure about that yet, but I’m learning more every day!"})
 
 # -----------------------
