@@ -1,135 +1,158 @@
-from flask import Flask, request, jsonify, render_template
-import random
-from datetime import datetime
-import wikipedia
+from flask import Flask, render_template, request, jsonify
 import requests
+import datetime
+import random
 
 app = Flask(__name__)
 
-# ===== MEMORY =====
-memory = []
+# -------- OFFLINE MEMORY --------
+creator_info = {
+    "name": "Charles Kanyama",
+    "color": "black",
+    "games": "Minecraft and eFootball",
+    "sport": "soccer",
+    "team": "Chelsea"
+}
 
-# ===== OFFLINE BRAIN =====
-def normalize(text):
-    return text.lower().strip()
+jokes_offline = [
+    "Why don’t programmers like nature? Too many bugs.",
+    "Why was the math book sad? It had too many problems.",
+    "I told my computer I needed a break… it froze."
+]
 
-def contains(text, words):
-    return any(word in text for word in words)
+greetings = ["hello", "hi", "hey"]
+farewells = ["bye", "goodbye"]
 
-def offline_brain(user_input):
-    text = normalize(user_input)
-
-    # TIME & DATE
-    if contains(text, ["time"]):
-        return f"The current time is {datetime.now().strftime('%H:%M:%S')}"
-    if contains(text, ["day", "date", "month", "year"]):
-        return f"Today is {datetime.now().strftime('%A, %d %B %Y')}"
-
-    # CREATOR / OWNER
-    if contains(text, ["creator", "created", "made you", "built you", "owner", "who made"]):
-        return random.choice([
-            "I was created by Charles Kanyama, the mind behind MidTech.",
-            "Charles Kanyama is my creator. I'm part of his MidTech vision.",
-            "My creator is Charles Kanyama. He designed me to be smart and helpful."
-        ])
-
-    # CREATOR FAVORITES
-    if contains(text, ["favorite color", "color do you like", "fav color"]):
-        return "Charles's favorite color is black."
-    if contains(text, ["favorite game", "game he likes"]):
-        return "Charles's favorite games are Minecraft and eFootball."
-    if contains(text, ["favorite sport", "sport he likes"]):
-        return "Charles's favorite sport is soccer, and his favorite team is Chelsea."
-
-    # BOT NAME
-    if contains(text, ["your name", "who are you", "what are you"]):
-        return random.choice([
-            "I’m MidTech AI, your intelligent assistant.",
-            "You’re chatting with MidTech AI.",
-            "I’m an AI assistant built for smart conversations."
-        ])
-
-    # EMOTIONS
-    if contains(text, ["sad", "tired", "sick", "unhappy", "not okay"]):
-        return random.choice([
-            "I’m sorry you're feeling that way. Remember to rest and take care of yourself.",
-            "That sounds tough. Try to relax a bit and give yourself some kindness.",
-            "I hope you feel better soon. Don’t forget to hydrate and rest."
-        ])
-    if contains(text, ["happy", "great", "good", "fine"]):
-        return random.choice([
-            "That’s wonderful to hear! Keep the positive energy going.",
-            "I love hearing that! Stay awesome.",
-            "Great! Keep enjoying your day."
-        ])
-
-    # GREETINGS
-    if contains(text, ["hello", "hi", "hey"]):
-        return random.choice([
-            "Hello! How can I help you today?",
-            "Hi there! Ask me anything.",
-            "Hey! I'm here for you."
-        ])
-
-    # JOKES
-    if contains(text, ["joke", "funny"]):
-        return random.choice([
-            "Why do programmers hate nature? Too many bugs.",
-            "I told my computer I needed a break… it said no problem and froze.",
-            "Why was the math book sad? Too many problems."
-        ])
-
-    # SIMPLE MATH
+# -------- API FUNCTIONS --------
+def wiki_search(query):
     try:
-        result = eval(text)
-        return f"The answer is {result}"
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
+        r = requests.get(url).json()
+        return r.get("extract")
     except:
-        pass
+        return None
 
-    return None
-
-# ===== ONLINE BRAIN =====
-def online_brain(user_input):
+def joke_api():
     try:
-        # Wikipedia first
-        wikipedia.set_lang("en")
-        summary = wikipedia.summary(user_input, sentences=2)
-        return f"From Wikipedia: {summary}"
+        r = requests.get("https://official-joke-api.appspot.com/random_joke").json()
+        return f"{r['setup']} — {r['punchline']}"
     except:
-        # Fallback DuckDuckGo
-        try:
-            url = f"https://api.duckduckgo.com/?q={user_input}&format=json&no_redirect=1"
-            response = requests.get(url).json()
-            abstract = response.get("AbstractText", "")
-            if abstract:
-                return f"From DuckDuckGo: {abstract}"
-        except:
-            pass
-    return "I’m still learning about that. I’ll find out more next time!"
+        return random.choice(jokes_offline)
 
-# ===== ROUTES =====
+def advice_api():
+    try:
+        r = requests.get("https://api.adviceslip.com/advice").json()
+        return r["slip"]["advice"]
+    except:
+        return "Always take care of yourself."
+
+def quote_api():
+    try:
+        r = requests.get("https://api.quotable.io/random").json()
+        return f"“{r['content']}” — {r['author']}"
+    except:
+        return "Keep pushing forward."
+
+def time_api():
+    try:
+        r = requests.get("http://worldtimeapi.org/api/timezone/Africa/Lusaka").json()
+        return r["datetime"]
+    except:
+        return str(datetime.datetime.now())
+
+def country_api(name):
+    try:
+        r = requests.get(f"https://restcountries.com/v3.1/name/{name}").json()[0]
+        return f"{r['name']['common']} — Capital: {r['capital'][0]}, Population: {r['population']}"
+    except:
+        return None
+
+def news_api():
+    try:
+        url = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/rss.xml"
+        r = requests.get(url).json()
+        articles = r["items"][:3]
+        return "\n".join([a["title"] for a in articles])
+    except:
+        return "No news available."
+
+def dictionary_api(word):
+    try:
+        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}").json()
+        meaning = r[0]["meanings"][0]["definitions"][0]["definition"]
+        return meaning
+    except:
+        return None
+
+# -------- CHAT LOGIC --------
+def smart_reply(msg):
+    m = msg.lower()
+
+    # greetings
+    if any(g in m for g in greetings):
+        return "Hello! How can I help you today?"
+
+    if any(f in m for f in farewells):
+        return "Goodbye! Have a great day."
+
+    # creator
+    if "who created" in m or "creator" in m:
+        return f"I was created by {creator_info['name']}."
+
+    if "favorite color" in m:
+        return f"My creator loves {creator_info['color']} color."
+
+    # jokes
+    if "joke" in m:
+        return joke_api()
+
+    # advice
+    if "advice" in m:
+        return advice_api()
+
+    # quotes
+    if "quote" in m:
+        return quote_api()
+
+    # time
+    if "time" in m or "date" in m:
+        return time_api()
+
+    # news
+    if "news" in m:
+        return news_api()
+
+    # country
+    if "country" in m:
+        word = m.split()[-1]
+        info = country_api(word)
+        if info:
+            return info
+
+    # dictionary
+    if "meaning" in m:
+        word = m.split()[-1]
+        meaning = dictionary_api(word)
+        if meaning:
+            return meaning
+
+    # wikipedia fallback
+    result = wiki_search(msg.replace(" ", "_"))
+    if result:
+        return result
+
+    return "I’m not sure yet, but I’m learning more every day!"
+
+# -------- ROUTES --------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    user_message = request.json["message"]
-
-    # Save user message in memory
-    memory.append({"role": "user", "content": user_message})
-
-    # Offline first
-    reply = offline_brain(user_message)
-
-    # Online fallback if offline doesn't know
-    if not reply:
-        reply = online_brain(user_message)
-
-    # Save bot reply in memory
-    memory.append({"role": "bot", "content": reply})
-
+    user_msg = request.json["message"]
+    reply = smart_reply(user_msg)
     return jsonify({"reply": reply})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
