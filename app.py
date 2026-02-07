@@ -5,7 +5,7 @@ import random
 
 app = Flask(__name__)
 
-# -------- OFFLINE MEMORY --------
+# ---------------- CREATOR MEMORY ----------------
 creator_info = {
     "name": "Charles Kanyama",
     "color": "black",
@@ -14,30 +14,53 @@ creator_info = {
     "team": "Chelsea"
 }
 
-jokes_offline = [
-    "Why don’t programmers like nature? Too many bugs.",
-    "Why was the math book sad? It had too many problems.",
-    "I told my computer I needed a break… it froze."
-]
-
-greetings = ["hello", "hi", "hey"]
+greetings = ["hi", "hello", "hey"]
 farewells = ["bye", "goodbye"]
 
-# -------- API FUNCTIONS --------
+# ---------------- APIs ----------------
+
 def wiki_search(query):
     try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-        r = requests.get(url).json()
-        return r.get("extract")
+        # Search correct page title first
+        search_url = "https://en.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": query,
+            "format": "json"
+        }
+        search = requests.get(search_url, params=params).json()
+        title = search["query"]["search"][0]["title"]
+
+        # Get summary
+        summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+        summary = requests.get(summary_url).json()
+        return summary.get("extract")
     except:
         return None
+
+
+def country_api(name):
+    try:
+        r = requests.get(f"https://restcountries.com/v3.1/name/{name}").json()
+        c = r[0]
+        return (
+            f"Country: {c['name']['common']}\n"
+            f"Capital: {c['capital'][0]}\n"
+            f"Population: {c['population']}\n"
+            f"Region: {c['region']}"
+        )
+    except:
+        return None
+
 
 def joke_api():
     try:
         r = requests.get("https://official-joke-api.appspot.com/random_joke").json()
         return f"{r['setup']} — {r['punchline']}"
     except:
-        return random.choice(jokes_offline)
+        return "Why don’t programmers like nature? Too many bugs."
+
 
 def advice_api():
     try:
@@ -46,6 +69,7 @@ def advice_api():
     except:
         return "Always take care of yourself."
 
+
 def quote_api():
     try:
         r = requests.get("https://api.quotable.io/random").json()
@@ -53,19 +77,14 @@ def quote_api():
     except:
         return "Keep pushing forward."
 
+
 def time_api():
     try:
         r = requests.get("http://worldtimeapi.org/api/timezone/Africa/Lusaka").json()
-        return r["datetime"]
+        return f"Current time: {r['datetime']}"
     except:
         return str(datetime.datetime.now())
 
-def country_api(name):
-    try:
-        r = requests.get(f"https://restcountries.com/v3.1/name/{name}").json()[0]
-        return f"{r['name']['common']} — Capital: {r['capital'][0]}, Population: {r['population']}"
-    except:
-        return None
 
 def news_api():
     try:
@@ -76,6 +95,7 @@ def news_api():
     except:
         return "No news available."
 
+
 def dictionary_api(word):
     try:
         r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}").json()
@@ -84,7 +104,8 @@ def dictionary_api(word):
     except:
         return None
 
-# -------- CHAT LOGIC --------
+# ---------------- SMART REPLY ----------------
+
 def smart_reply(msg):
     m = msg.lower()
 
@@ -95,14 +116,20 @@ def smart_reply(msg):
     if any(f in m for f in farewells):
         return "Goodbye! Have a great day."
 
-    # creator
+    # creator questions
     if "who created" in m or "creator" in m:
         return f"I was created by {creator_info['name']}."
 
     if "favorite color" in m:
-        return f"My creator loves {creator_info['color']} color."
+        return f"My creator's favorite color is {creator_info['color']}."
 
-    # jokes
+    if "favorite game" in m:
+        return f"{creator_info['name']} enjoys {creator_info['games']}."
+
+    if "team" in m or "club" in m:
+        return f"The favorite team is {creator_info['team']}."
+
+    # joke
     if "joke" in m:
         return joke_api()
 
@@ -110,11 +137,11 @@ def smart_reply(msg):
     if "advice" in m:
         return advice_api()
 
-    # quotes
-    if "quote" in m:
+    # quote
+    if "quote" in m or "motivate" in m:
         return quote_api()
 
-    # time
+    # time/date
     if "time" in m or "date" in m:
         return time_api()
 
@@ -124,26 +151,27 @@ def smart_reply(msg):
 
     # country
     if "country" in m:
-        word = m.split()[-1]
-        info = country_api(word)
+        name = m.split()[-1]
+        info = country_api(name)
         if info:
             return info
 
-    # dictionary
+    # meaning
     if "meaning" in m:
         word = m.split()[-1]
         meaning = dictionary_api(word)
         if meaning:
             return meaning
 
-    # wikipedia fallback
-    result = wiki_search(msg.replace(" ", "_"))
+    # wikipedia fallback for anything else
+    result = wiki_search(msg)
     if result:
         return result
 
     return "I’m not sure yet, but I’m learning more every day!"
 
-# -------- ROUTES --------
+# ---------------- ROUTES ----------------
+
 @app.route("/")
 def home():
     return render_template("index.html")
