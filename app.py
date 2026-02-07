@@ -1,107 +1,147 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
+import random
 import requests
 
 app = Flask(__name__)
 
-# ------------------------------
-# BASIC MEMORY (offline knowledge)
-# ------------------------------
-memory = {
-    "hello": "Hello! I am MidTechAI. Ask me anything.",
-    "hi": "Hi there! How can I help you today?",
+# -----------------------
+# Offline memory & owner info
+# -----------------------
+OWNER_INFO = {
+    "name": "Charles",
+    "favorite_color": "black",
+    "favorite_game": ["Minecraft", "eFootball"],
+    "favorite_sport": "soccer",
+    "favorite_team": "Chelsea"
 }
 
+BOT_INFO = {
+    "name": "MidTechAI",
+    "creator": OWNER_INFO["name"],
+    "purpose": "To chat, provide information, advice, jokes, and comfort when needed.",
+    "abilities": "Offline knowledge, online research, math, jokes, advice, time/date, owner info."
+}
 
-# ------------------------------
-# INTERNET RESEARCH FUNCTIONS
-# ------------------------------
+OFFLINE_RESPONSES = {
+    "greetings": [
+        "Hello there! How’s your day going?",
+        "Hi! Nice to see you.",
+        "Hey! How can I help you today?"
+    ],
+    "farewell": [
+        "Goodbye! Talk to you soon.",
+        "See you later! Stay safe.",
+        "Bye! Have a great day."
+    ],
+    "comfort": [
+        "I understand. Take a deep breath, everything will be fine.",
+        "I’m here for you. Stay strong!",
+        "It’s okay to feel that way. I’m with you."
+    ],
+    "jokes": [
+        "Why don’t scientists trust atoms? Because they make up everything!",
+        "Why did the math book look sad? Because it had too many problems!",
+        "I would tell you a construction joke, but I’m still working on it!"
+    ],
+    "advice": [
+        "Remember to take breaks and stay hydrated.",
+        "Always focus on what you can control.",
+        "Learning is a journey; don’t rush it."
+    ]
+}
 
-def search_wikipedia(query):
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            return data.get("extract")
-    except:
-        return None
+# -----------------------
+# Helper Functions
+# -----------------------
+def get_offline_reply(message):
+    message = message.lower()
 
+    # Greetings
+    if any(greet in message for greet in ["hello", "hi", "hey"]):
+        return random.choice(OFFLINE_RESPONSES["greetings"])
 
-def search_duckduckgo(query):
-    try:
-        url = "https://api.duckduckgo.com/"
-        params = {
-            "q": query,
-            "format": "json",
-            "no_html": 1,
-            "skip_disambig": 1
-        }
-        res = requests.get(url, params=params, timeout=5)
-        data = res.json()
-        return data.get("AbstractText")
-    except:
-        return None
+    # Farewell
+    if any(farewell in message for farewell in ["bye", "goodbye", "see you"]):
+        return random.choice(OFFLINE_RESPONSES["farewell"])
 
+    # Comfort
+    if any(word in message for word in ["sad", "tired", "sick", "unhappy"]):
+        return random.choice(OFFLINE_RESPONSES["comfort"])
 
-def research_online(question):
-    # Try Wikipedia first
-    answer = search_wikipedia(question.replace(" ", "_"))
-    if answer:
-        return answer
+    # Jokes
+    if "joke" in message:
+        return random.choice(OFFLINE_RESPONSES["jokes"])
 
-    # Then DuckDuckGo
-    answer = search_duckduckgo(question)
-    if answer:
-        return answer
+    # Advice
+    if "advice" in message or "help me" in message:
+        return random.choice(OFFLINE_RESPONSES["advice"])
+
+    # Owner info
+    if any(word in message for word in ["who created you", "who made you", "creator", "owner"]):
+        return f"I was created by {OWNER_INFO['name']}."
+
+    if "your name" in message or "who are you" in message:
+        return BOT_INFO["name"]
+
+    if "favorite color" in message:
+        return f"My creator's favorite color is {OWNER_INFO['favorite_color']}."
+
+    if "favorite game" in message:
+        games = ", ".join(OWNER_INFO["favorite_game"])
+        return f"My creator loves to play {games}."
+
+    if "favorite sport" in message:
+        return f"My creator's favorite sport is {OWNER_INFO['favorite_sport']}."
+
+    if "favorite team" in message:
+        return f"My creator supports {OWNER_INFO['favorite_team']}."
+
+    if "who is your creator" in message or "who made you" in message:
+        return f"My creator is {OWNER_INFO['name']}."
 
     return None
 
+def fetch_online_info(query):
+    """
+    Fetch simple summary from Wikipedia using its API.
+    """
+    try:
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if "extract" in data:
+                return data["extract"]
+        return None
+    except:
+        return None
 
-# ------------------------------
-# AI BRAIN
-# ------------------------------
-
-def midtechai_brain(user_message):
-    msg = user_message.lower().strip()
-
-    # 1. Check memory first
-    if msg in memory:
-        return memory[msg]
-
-    # 2. If not known → research online
-    online_answer = research_online(user_message)
-    if online_answer:
-        return online_answer
-
-    # 3. Final fallback
-    return "I couldn't find information about that yet. Try asking in a different way."
-
-
-# ------------------------------
-# API ROUTES
-# ------------------------------
-
+# -----------------------
+# Routes
+# -----------------------
 @app.route("/", methods=["GET"])
 def home():
-    return "MidTechAI is running!"
-
+    return render_template("index.html")
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_message = data.get("message", "")
+    user_message = request.get_json().get("message", "")
+    
+    # First, try offline memory
+    reply = get_offline_reply(user_message)
+    if reply:
+        return jsonify({"reply": reply})
 
-    reply = midtechai_brain(user_message)
+    # Next, try online fetch (Wikipedia)
+    online_reply = fetch_online_info(user_message)
+    if online_reply:
+        return jsonify({"reply": online_reply})
 
-    return jsonify({
-        "user": user_message,
-        "reply": reply
-    })
+    # Fallback
+    return jsonify({"reply": "I’m not sure about that yet, but I’m learning more every day!"})
 
-
-# ------------------------------
-# RUN SERVER
-# ------------------------------
-
+# -----------------------
+# Run App
+# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
