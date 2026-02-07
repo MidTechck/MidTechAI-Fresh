@@ -1,110 +1,14 @@
-from flask import Flask, render_template, request, jsonify
-import requests
-import datetime
-import random
+def clean_question(text):
+    words_to_remove = [
+        "who is", "who was", "what is", "tell me about",
+        "explain", "define", "country", "meaning of",
+        "the", "a", "an", "in", "on", "at"
+    ]
+    t = text.lower()
+    for w in words_to_remove:
+        t = t.replace(w, "")
+    return t.strip()
 
-app = Flask(__name__)
-
-# ---------------- CREATOR MEMORY ----------------
-creator_info = {
-    "name": "Charles Kanyama",
-    "color": "black",
-    "games": "Minecraft and eFootball",
-    "sport": "soccer",
-    "team": "Chelsea"
-}
-
-greetings = ["hi", "hello", "hey"]
-farewells = ["bye", "goodbye"]
-
-# ---------------- APIs ----------------
-
-def wiki_search(query):
-    try:
-        # Search correct page title first
-        search_url = "https://en.wikipedia.org/w/api.php"
-        params = {
-            "action": "query",
-            "list": "search",
-            "srsearch": query,
-            "format": "json"
-        }
-        search = requests.get(search_url, params=params).json()
-        title = search["query"]["search"][0]["title"]
-
-        # Get summary
-        summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
-        summary = requests.get(summary_url).json()
-        return summary.get("extract")
-    except:
-        return None
-
-
-def country_api(name):
-    try:
-        r = requests.get(f"https://restcountries.com/v3.1/name/{name}").json()
-        c = r[0]
-        return (
-            f"Country: {c['name']['common']}\n"
-            f"Capital: {c['capital'][0]}\n"
-            f"Population: {c['population']}\n"
-            f"Region: {c['region']}"
-        )
-    except:
-        return None
-
-
-def joke_api():
-    try:
-        r = requests.get("https://official-joke-api.appspot.com/random_joke").json()
-        return f"{r['setup']} — {r['punchline']}"
-    except:
-        return "Why don’t programmers like nature? Too many bugs."
-
-
-def advice_api():
-    try:
-        r = requests.get("https://api.adviceslip.com/advice").json()
-        return r["slip"]["advice"]
-    except:
-        return "Always take care of yourself."
-
-
-def quote_api():
-    try:
-        r = requests.get("https://api.quotable.io/random").json()
-        return f"“{r['content']}” — {r['author']}"
-    except:
-        return "Keep pushing forward."
-
-
-def time_api():
-    try:
-        r = requests.get("http://worldtimeapi.org/api/timezone/Africa/Lusaka").json()
-        return f"Current time: {r['datetime']}"
-    except:
-        return str(datetime.datetime.now())
-
-
-def news_api():
-    try:
-        url = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/rss.xml"
-        r = requests.get(url).json()
-        articles = r["items"][:3]
-        return "\n".join([a["title"] for a in articles])
-    except:
-        return "No news available."
-
-
-def dictionary_api(word):
-    try:
-        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}").json()
-        meaning = r[0]["meanings"][0]["definitions"][0]["definition"]
-        return meaning
-    except:
-        return None
-
-# ---------------- SMART REPLY ----------------
 
 def smart_reply(msg):
     m = msg.lower()
@@ -151,36 +55,22 @@ def smart_reply(msg):
 
     # country
     if "country" in m:
-        name = m.split()[-1]
+        name = clean_question(m)
         info = country_api(name)
         if info:
             return info
 
     # meaning
     if "meaning" in m:
-        word = m.split()[-1]
+        word = clean_question(m)
         meaning = dictionary_api(word)
         if meaning:
             return meaning
 
-    # wikipedia fallback for anything else
-    result = wiki_search(msg)
+    # -------- STRONG WIKIPEDIA FIX --------
+    topic = clean_question(m)
+    result = wiki_search(topic)
     if result:
         return result
 
     return "I’m not sure yet, but I’m learning more every day!"
-
-# ---------------- ROUTES ----------------
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_msg = request.json["message"]
-    reply = smart_reply(user_msg)
-    return jsonify({"reply": reply})
-
-if __name__ == "__main__":
-    app.run()
