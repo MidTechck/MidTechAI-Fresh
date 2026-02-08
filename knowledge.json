@@ -1,0 +1,26 @@
+{
+    "creator": {
+        "name": "Charles",
+        "favorite_color": "black",
+        "favorite_game": [
+            "Minecraft",
+            "eFootball"
+        ],
+        "favorite_sport": "soccer",
+        "favorite_team": "Chelsea"
+    },
+    "facts": {
+        "amosi chipasi": "Amosi Chipasi is a notable person locally.",
+        "elona musk": "Elon Musk is the CEO of Tesla and SpaceX.",
+        "bill gates": "Bill Gates co-founded Microsoft.",
+        "world's best player 2009": "Lionel Messi won the FIFA World Player of the Year 2009."
+    },
+    "jokes": [
+        "Why did the computer show up at work late? It had a hard drive!",
+        "Why did the smartphone need glasses? It lost its contacts.",
+        "Why don\u2019t scientists trust atoms? Because they make up everything!"
+    ],
+    "context": {
+        "default": {}
+    }
+}

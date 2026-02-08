@@ -1,240 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MidTechAI Assistant</title>
-    <style>
-        /* ----- Reset & Body ----- */
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e;
-            color: #eee;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        /* ----- Header ----- */
-        header {
-            background-color: #0d0d0d;
-            padding: 15px 20px;
-            font-size: 1.4rem;
-            font-weight: bold;
-            text-align: center;
-            color: #4cafef;
-        }
-
-        /* ----- Chat Container ----- */
-        .chat-container {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        /* ----- Messages ----- */
-        .message {
-            max-width: 75%;
-            padding: 10px 15px;
-            border-radius: 15px;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s;
-        }
-
-        .user {
-            background-color: #4cafef;
-            color: #fff;
-            align-self: flex-end;
-            border-bottom-right-radius: 0;
-        }
-
-        .bot {
-            background-color: #2e2e2e;
-            color: #eee;
-            align-self: flex-start;
-            border-bottom-left-radius: 0;
-        }
-
-        /* ----- Typing Animation ----- */
-        .typing {
-            width: 100px;
-            height: 10px;
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            margin-left: 10px;
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            background-color: #4cafef;
-            border-radius: 50%;
-            animation: blink 1.2s infinite;
-        }
-
-        .dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes blink {
-            0%, 80%, 100% { opacity: 0; }
-            40% { opacity: 1; }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ----- Input Bar ----- */
-        .input-bar {
-            display: flex;
-            padding: 10px 20px;
-            background-color: #121212;
-            gap: 10px;
-        }
-
-        .input-bar input {
-            flex: 1;
-            padding: 12px 15px;
-            border-radius: 25px;
-            border: none;
-            background-color: #2e2e2e;
-            color: #eee;
-            font-size: 1rem;
-            outline: none;
-        }
-
-        .input-bar button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 25px;
-            background-color: #4cafef;
-            color: #fff;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .input-bar button:hover {
-            background-color: #3a9bdc;
-        }
-
-        /* ----- Light Mode ----- */
-        body.light-mode {
-            background-color: #f0f0f0;
-            color: #111;
-        }
-
-        body.light-mode .bot {
-            background-color: #e0e0e0;
-            color: #111;
-        }
-
-        body.light-mode .user {
-            background-color: #4cafef;
-            color: #fff;
-        }
-
-        body.light-mode .input-bar input {
-            background-color: #ddd;
-            color: #111;
-        }
-
-        body.light-mode header {
-            background-color: #4cafef;
-            color: #fff;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MidTechAI Assistant</title>
+<style>
+body { background:#121212; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; height:100vh; margin:0; }
+header { padding:10px; text-align:center; background:#1f1f1f; font-size:1.5em; }
+#chat { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
+.message { margin:5px 0; padding:10px; border-radius:10px; max-width:70%; }
+.user { align-self:flex-end; background:#333; }
+.bot { align-self:flex-start; background:#0055ff; }
+#input-area { display:flex; padding:10px; background:#1f1f1f; }
+#user-input { flex:1; padding:10px; border:none; border-radius:10px; background:#2a2a2a; color:#fff; }
+#send-btn { padding:10px 15px; margin-left:5px; border:none; border-radius:10px; background:#0055ff; color:#fff; cursor:pointer; }
+.typing { font-style:italic; font-size:0.9em; color:#aaa; margin-left:5px; }
+</style>
 </head>
 <body>
-    <header>MidTechAI Assistant</header>
+<header>MidTechAI Assistant</header>
+<div id="chat"></div>
+<div id="input-area">
+<input id="user-input" placeholder="Type your message..." autocomplete="off">
+<button id="send-btn">Send</button>
+</div>
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("user-input");
+const btn = document.getElementById("send-btn");
 
-    <div class="chat-container" id="chat-container"></div>
+function addMessage(text, cls) {
+    const div = document.createElement("div");
+    div.className = "message " + cls;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
 
-    <div class="input-bar">
-        <input type="text" id="user-input" placeholder="Type your message..." />
-        <button id="send-btn">Send</button>
-        <button id="toggle-mode">🌗</button>
-    </div>
+btn.onclick = async () => {
+    const msg = input.value.trim();
+    if(!msg) return;
+    addMessage(msg, "user");
+    input.value = "";
+    const typing = document.createElement("div");
+    typing.className = "typing bot";
+    typing.textContent = "MidTechAI is typing...";
+    chat.appendChild(typing);
+    chat.scrollTop = chat.scrollHeight;
 
-    <script>
-        const chatContainer = document.getElementById("chat-container");
-        const userInput = document.getElementById("user-input");
-        const sendBtn = document.getElementById("send-btn");
-        const toggleBtn = document.getElementById("toggle-mode");
-
-        // Toggle dark/light mode
-        toggleBtn.addEventListener("click", () => {
-            document.body.classList.toggle("light-mode");
-        });
-
-        // Add message to chat
-        function addMessage(text, className) {
-            const div = document.createElement("div");
-            div.classList.add("message", className);
-            div.innerHTML = text;
-            chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // Show typing animation
-        function showTyping() {
-            const typingDiv = document.createElement("div");
-            typingDiv.classList.add("message", "bot");
-            typingDiv.id = "typing";
-            typingDiv.innerHTML = `<div class="typing">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>`;
-            chatContainer.appendChild(typingDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // Remove typing animation
-        function removeTyping() {
-            const typingDiv = document.getElementById("typing");
-            if (typingDiv) typingDiv.remove();
-        }
-
-        // Send message
-        async function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message) return;
-            addMessage(message, "user");
-            userInput.value = "";
-
-            showTyping();
-
-            try {
-                const res = await fetch("/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message })
-                });
-                const data = await res.json();
-                removeTyping();
-                addMessage(data.reply, "bot");
-            } catch (err) {
-                removeTyping();
-                addMessage("Error: Could not reach the server.", "bot");
-            }
-        }
-
-        sendBtn.addEventListener("click", sendMessage);
-        userInput.addEventListener("keydown", e => {
-            if (e.key === "Enter") sendMessage();
-        });
-    </script>
+    const res = await fetch("/ask", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({message: msg})
+    });
+    const data = await res.json();
+    chat.removeChild(typing);
+    addMessage(data.response, "bot");
+}
+input.addEventListener("keypress", function(e){
+    if(e.key === "Enter"){ btn.click(); }
+});
+</script>
 </body>
 </html>
