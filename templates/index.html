@@ -2,64 +2,132 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>MidTechAI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MidTechAI Assistant</title>
+
 <style>
-body { background:#121212; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; height:100vh; margin:0; }
-header { padding:10px; text-align:center; background:#1f1f1f; font-size:1.5em; }
-#chat { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
-.message { margin:5px 0; padding:10px; border-radius:10px; max-width:70%; }
-.user { align-self:flex-end; background:#333; }
-.bot { align-self:flex-start; background:#0055ff; }
-#input-area { display:flex; padding:10px; background:#1f1f1f; }
-#user-input { flex:1; padding:10px; border:none; border-radius:10px; background:#2a2a2a; color:#fff; }
-#send-btn { padding:10px 15px; margin-left:5px; border:none; border-radius:10px; background:#0055ff; color:#fff; cursor:pointer; }
-.typing { font-style:italic; font-size:0.9em; color:#aaa; margin-left:5px; }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    background: #020617;
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+#chat {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 12px;
+    max-width: 80%;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.user {
+    background: #2563eb;
+    margin-left: auto;
+}
+
+.bot {
+    background: #1e293b;
+}
+
+#input-area {
+    display: flex;
+    padding: 10px;
+    background: #020617;
+}
+
+#input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+}
+
+button {
+    margin-left: 10px;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    background: #22c55e;
+    cursor: pointer;
+}
 </style>
 </head>
+
 <body>
-<header>MidTechAI Assistant</header>
+
+<header>MidTechAI 🤖</header>
+
 <div id="chat"></div>
+
 <div id="input-area">
-<input id="user-input" placeholder="Type your message..." autocomplete="off">
-<button id="send-btn">Send</button>
+    <input id="input" placeholder="Ask me anything..." />
+    <button onclick="send()">Send</button>
 </div>
+
 <script>
 const chat = document.getElementById("chat");
-const input = document.getElementById("user-input");
-const btn = document.getElementById("send-btn");
 
 function addMessage(text, cls) {
     const div = document.createElement("div");
     div.className = "message " + cls;
-    div.textContent = text;
+    div.innerText = text;
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 }
 
-btn.onclick = async () => {
-    const msg = input.value.trim();
-    if(!msg) return;
-    addMessage(msg, "user");
-    input.value = "";
-    const typing = document.createElement("div");
-    typing.className = "typing bot";
-    typing.textContent = "MidTechAI is typing...";
-    chat.appendChild(typing);
+function typingIndicator() {
+    const div = document.createElement("div");
+    div.className = "message bot";
+    div.id = "typing";
+    div.innerText = "MidTechAI is typing...";
+    chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
-
-    const res = await fetch("/ask", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({message: msg})
-    });
-    const data = await res.json();
-    chat.removeChild(typing);
-    addMessage(data.response, "bot");
 }
-input.addEventListener("keypress", function(e){
-    if(e.key === "Enter"){ btn.click(); }
+
+async function send() {
+    const input = document.getElementById("input");
+    const text = input.value.trim();
+    if (!text) return;
+
+    addMessage(text, "user");
+    input.value = "";
+
+    typingIndicator();
+
+    const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+    });
+
+    document.getElementById("typing").remove();
+
+    const data = await res.json();
+    addMessage(data.reply, "bot");
+}
+
+document.getElementById("input").addEventListener("keypress", e => {
+    if (e.key === "Enter") send();
 });
 </script>
+
 </body>
 </html>
