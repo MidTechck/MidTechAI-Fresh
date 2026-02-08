@@ -4,13 +4,12 @@ import os
 import asyncio
 import aiohttp
 
-# ---------- CONFIG ----------
+# ---------------- CONFIG ----------------
 HF_TOKEN = os.getenv("HF_TOKEN")  # Hugging Face token
 HF_API = "https://api-inference.huggingface.co/models/flan-t5-large"
+WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php"
 
-WIKI_API = "https://en.wikipedia.org/api/rest_v1/page/summary/"
-
-# ---------- APP SETUP ----------
+# ---------------- APP SETUP ----------------
 app = Flask(__name__)
 
 # Load local knowledge
@@ -20,53 +19,66 @@ if os.path.exists("knowledge.json"):
 else:
     knowledge = {"owner": "Unknown", "facts": {}}
 
-# ---------- HELPERS ----------
+# ---------------- HELPERS ----------------
 def query_local(question):
-    """
-    Check local knowledge first
-    """
     q_lower = question.lower()
     for key, val in knowledge["facts"].items():
         if key in q_lower:
             return val
-    # owner recognition
     if "who is my owner" in q_lower:
         return f"Your owner is {knowledge.get('owner', 'Unknown')}."
     return None
 
 async def query_wikipedia(question):
     """
-    Try Wikipedia API for factual answers
+    Search Wikipedia for a page, return extract of top result
     """
+    params = {
+        "action": "query",
+        "format": "json",
+        "list": "search",
+        "srsearch": question
+    }
     try:
-        search_term = question.replace(" ", "_")
         async with aiohttp.ClientSession() as session:
-            async with session.get(WIKI_API + search_term) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("extract", None)
+            async with session.get(WIKI_SEARCH_API, params=params) as resp:
+                data = await resp.json()
+                search_results = data.get("query", {}).get("search", [])
+                if not search_results:
+                    return None
+                top_title = search_results[0]["title"]
+                # Fetch page summary
+                async with session.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{top_title.replace(' ','_')}") as summary_resp:
+                    if summary_resp.status == 200:
+                        summary_data = await summary_resp.json()
+                        extract = summary_data.get("extract")
+                        if extract:
+                            # Cache locally
+                            knowledge["facts"][question.lower()] = extract
+                            with open("knowledge.json", "w") as f:
+                                json.dump(knowledge, f, indent=2)
+                            return extract
     except:
         return None
 
 async def query_hf(question, context=None):
-    """
-    Query Hugging Face Flan-T5 API asynchronously
-    """
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     prompt = question if not context else context + "\n" + question
     payload = {"inputs": prompt}
-    async with aiohttp.ClientSession() as session:
-        async with session.post(HF_API, headers=headers, json=payload) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                if isinstance(data, list) and "generated_text" in data[0]:
-                    return data[0]["generated_text"]
-                elif isinstance(data, list):
-                    return data[0].get("generated_text", str(data[0]))
-            return None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(HF_API, headers=headers, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, list) and "generated_text" in data[0]:
+                        return data[0]["generated_text"]
+                    elif isinstance(data, list):
+                        return data[0].get("generated_text", str(data[0]))
+    except:
+        return None
 
 async def get_answer(question, memory=None):
-    # 1. Greetings & casual conversation
+    # 1. Greetings
     greetings = ["hello", "hi", "hey", "good morning", "good evening"]
     if any(greet in question.lower() for greet in greetings):
         return "Hello! How are you today?"
@@ -76,21 +88,24 @@ async def get_answer(question, memory=None):
     if local:
         return local
 
-    # 3. Wikipedia online fallback
+    # 3. Wikipedia search & cache
     wiki_answer = await query_wikipedia(question)
     if wiki_answer:
+        # Feed wiki summary to Flan-T5 for natural answer
+        hf_answer = await query_hf(question, context=wiki_answer)
+        if hf_answer:
+            return hf_answer
         return wiki_answer
 
-    # 4. Hugging Face reasoning fallback
+    # 4. Flan-T5 fallback
     context = "\n".join(memory) if memory else None
     hf_answer = await query_hf(question, context=context)
     if hf_answer:
         return hf_answer
 
-    # 5. Default response
     return "I'm not sure yet, but I'm learning more every day!"
 
-# ---------- ROUTES ----------
+# ---------------- ROUTES ----------------
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -101,11 +116,9 @@ def ask():
     question = data.get("question", "")
     if not question:
         return jsonify({"answer": "Please ask a question!"})
-
-    # memory could be enhanced for multi-turn conversations
     answer = asyncio.run(get_answer(question, memory=[]))
     return jsonify({"answer": answer})
 
-# ---------- RUN ----------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
