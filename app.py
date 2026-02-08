@@ -12,12 +12,20 @@ WIKI_SEARCH_API = "https://en.wikipedia.org/w/api.php"
 # ---------------- APP SETUP ----------------
 app = Flask(__name__)
 
-# Load local knowledge
+# Self and owner info
+SELF_NAME = "MidTechAI"
+OWNER_NAME = "Charles"  # change as needed
+
+# Load or create local knowledge
 if os.path.exists("knowledge.json"):
     with open("knowledge.json", "r") as f:
         knowledge = json.load(f)
 else:
-    knowledge = {"owner": "Unknown", "facts": {}}
+    knowledge = {
+        "owner": OWNER_NAME,
+        "self_name": SELF_NAME,
+        "facts": {}
+    }
 
 # ---------------- HELPERS ----------------
 def query_local(question):
@@ -25,14 +33,17 @@ def query_local(question):
     for key, val in knowledge["facts"].items():
         if key in q_lower:
             return val
+    # Self-awareness and owner recognition
+    if "your name" in q_lower or "who are you" in q_lower:
+        return f"My name is {SELF_NAME}."
+    if "my name" in q_lower or "who am i" in q_lower:
+        return f"Your name is {knowledge.get('owner', 'Unknown')}."
     if "who is my owner" in q_lower:
         return f"Your owner is {knowledge.get('owner', 'Unknown')}."
     return None
 
 async def query_wikipedia(question):
-    """
-    Search Wikipedia for a page, return extract of top result
-    """
+    """Search Wikipedia and return summary."""
     params = {
         "action": "query",
         "format": "json",
@@ -47,13 +58,11 @@ async def query_wikipedia(question):
                 if not search_results:
                     return None
                 top_title = search_results[0]["title"]
-                # Fetch page summary
                 async with session.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{top_title.replace(' ','_')}") as summary_resp:
                     if summary_resp.status == 200:
                         summary_data = await summary_resp.json()
                         extract = summary_data.get("extract")
                         if extract:
-                            # Cache locally
                             knowledge["facts"][question.lower()] = extract
                             with open("knowledge.json", "w") as f:
                                 json.dump(knowledge, f, indent=2)
@@ -78,26 +87,25 @@ async def query_hf(question, context=None):
         return None
 
 async def get_answer(question, memory=None):
-    # 1. Greetings
+    # Greetings
     greetings = ["hello", "hi", "hey", "good morning", "good evening"]
     if any(greet in question.lower() for greet in greetings):
-        return "Hello! How are you today?"
+        return f"Hello {knowledge.get('owner','User')}! How are you today?"
 
-    # 2. Local knowledge
+    # Local knowledge
     local = query_local(question)
     if local:
         return local
 
-    # 3. Wikipedia search & cache
+    # Wikipedia search
     wiki_answer = await query_wikipedia(question)
     if wiki_answer:
-        # Feed wiki summary to Flan-T5 for natural answer
         hf_answer = await query_hf(question, context=wiki_answer)
         if hf_answer:
             return hf_answer
         return wiki_answer
 
-    # 4. Flan-T5 fallback (reasoning / human-like response)
+    # Flan-T5 fallback
     context = "\n".join(memory) if memory else None
     hf_answer = await query_hf(question, context=context)
     if hf_answer:
