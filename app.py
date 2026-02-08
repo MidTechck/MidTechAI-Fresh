@@ -1,146 +1,85 @@
 from flask import Flask, render_template, request, jsonify
 import json
-import random
-import requests
 import os
+import requests
+import asyncio
+import aiohttp
 
+# ---------- CONFIG ----------
+HF_TOKEN = os.getenv("HF_TOKEN")  # Hugging Face token
+HF_API = "https://api-inference.huggingface.co/models/flan-t5-large"
+
+# ---------- APP SETUP ----------
 app = Flask(__name__)
 
-# -----------------------------
-# Offline Knowledge & Personality
-# -----------------------------
-offline_knowledge = {
-    "assistant_name": "MidTechAI",
-    "creator": "Your Name",
-    "creator_favorites": {
-        "color": "black",
-        "game": ["Minecraft", "eFootball"],
-        "sport": "soccer",
-        "team": "Chelsea"
-    },
-    "greetings": [
-        "Hey there!", "Hi! How’s it going?", "Hello! 😊", "Yo! What's up?"
-    ],
-    "farewells": [
-        "Bye! Take care!", "See you later!", "Catch you soon!", "Goodbye!"
-    ],
-    "comforts": [
-        "I’m here for you.", "Everything will be okay.", "Sending virtual hugs 🤗"
-    ],
-    "apologies": [
-        "Sorry about that.", "My bad!", "I’ll do better next time."
-    ],
-    "appreciations": [
-        "Thanks a lot!", "Much appreciated!", "I’m glad you said that!"
-    ]
-}
+# Load local knowledge
+if os.path.exists("knowledge.json"):
+    with open("knowledge.json", "r") as f:
+        knowledge = json.load(f)
+else:
+    knowledge = {"owner": "Unknown", "facts": {}}
 
-# -----------------------------
-# Hugging Face API setup
-# -----------------------------
-HF_TOKEN = os.getenv("HF_TOKEN") or "YOUR_HF_TOKEN_HERE"
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
-HF_MODEL = "google/flan-t5-small"
-
-def humanize_response(text, user_input):
-    payload = {
-        "inputs": f"Explain this to a human in a friendly conversational way:\n{text}\nUser asked: {user_input}",
-        "parameters": {"max_new_tokens": 300}
-    }
-    try:
-        r = requests.post(f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-                          headers=HEADERS, json=payload, timeout=10)
-        if r.status_code == 200:
-            return r.json()[0].get('generated_text', text)
-    except:
-        pass
-    return text
-
-# -----------------------------
-# Offline Response
-# -----------------------------
-def offline_reply(user_input):
-    lower = user_input.lower()
-    
-    if any(g in lower for g in ["hello", "hi", "hey", "yo"]):
-        return random.choice(offline_knowledge["greetings"])
-    
-    if any(f in lower for f in ["bye", "goodbye", "see you"]):
-        return random.choice(offline_knowledge["farewells"])
-    
-    if any(w in lower for w in ["sad", "tired", "sick", "happy"]):
-        return random.choice(offline_knowledge["comforts"])
-    
-    if "sorry" in lower:
-        return random.choice(offline_knowledge["apologies"])
-    
-    if any(w in lower for w in ["thank", "thanks"]):
-        return random.choice(offline_knowledge["appreciations"])
-    
-    if any(w in lower for w in ["who created you", "who is your creator", "who made you"]):
-        fav = offline_knowledge["creator_favorites"]
-        return f"I was created by {offline_knowledge['creator']}. " \
-               f"They love {fav['color']}, play {', '.join(fav['game'])}, " \
-               f"enjoy {fav['sport']}, and their favorite team is {fav['team']}."
-    
-    if any(w in lower for w in ["your name", "who are you"]):
-        return f"My name is {offline_knowledge['assistant_name']}. I’m your assistant!"
-    
+# ---------- HELPERS ----------
+def query_local(question):
+    """
+    Check local knowledge first
+    """
+    q_lower = question.lower()
+    for key, val in knowledge["facts"].items():
+        if key in q_lower:
+            return val
+    # owner recognition
+    if "who is my owner" in q_lower:
+        return f"Your owner is {knowledge.get('owner', 'Unknown')}."
     return None
 
-# -----------------------------
-# Online Search
-# -----------------------------
-def online_search(query):
-    try:
-        wiki_resp = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
-            timeout=3
-        )
-        if wiki_resp.status_code == 200:
-            data = wiki_resp.json()
-            if "extract" in data:
-                return data["extract"]
-    except:
-        pass
-    try:
-        ddg_resp = requests.get(
-            "https://api.duckduckgo.com/",
-            params={"q": query, "format": "json", "no_redirect": 1},
-            timeout=3
-        )
-        data = ddg_resp.json()
-        answer = data.get("AbstractText")
-        if answer:
-            return answer
-    except:
-        pass
-    return None
+async def query_hf(question):
+    """
+    Query Hugging Face Flan-T5 API asynchronously
+    """
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    payload = {"inputs": question}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(HF_API, headers=headers, json=payload) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                # Hugging Face response may vary, get first text output
+                if isinstance(data, list) and "generated_text" in data[0]:
+                    return data[0]["generated_text"]
+                elif isinstance(data, list):
+                    return data[0].get("generated_text", str(data[0]))
+            return "I'm thinking... but I couldn't get an answer online."
 
-# -----------------------------
-# Routes
-# -----------------------------
+async def get_answer(question):
+    # 1. Check greetings and simple offline responses
+    greetings = ["hello", "hi", "hey", "good morning", "good evening"]
+    if any(greet in question.lower() for greet in greetings):
+        return "Hello! How are you today?"
+    
+    # 2. Check local knowledge
+    local = query_local(question)
+    if local:
+        return local
+
+    # 3. Fallback to Hugging Face
+    answer = await query_hf(question)
+    return answer
+
+# ---------- ROUTES ----------
 @app.route("/")
-def home():
+def index():
     return render_template("index.html")
 
 @app.route("/ask", methods=["POST"])
 def ask():
-    user_input = request.json.get("message")
-    
-    reply = offline_reply(user_input)
-    if reply:
-        return jsonify({"reply": reply})
-    
-    search_result = online_search(user_input)
-    if search_result:
-        reply = humanize_response(search_result, user_input)
-        return jsonify({"reply": reply})
-    
-    return jsonify({"reply": "I’m thinking about that… give me a moment."})
+    data = request.get_json()
+    question = data.get("question", "")
+    if not question:
+        return jsonify({"answer": "Please ask a question!"})
 
-# -----------------------------
-# Run App
-# -----------------------------
+    answer = asyncio.run(get_answer(question))
+    return jsonify({"answer": answer})
+
+# ---------- RUN ----------
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=8080, debug=True)
