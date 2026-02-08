@@ -4,17 +4,16 @@ import os
 import requests
 
 # ---------------- CONFIG ----------------
-HF_TOKEN = os.getenv("HF_TOKEN")  # Hugging Face token
+HF_TOKEN = os.getenv("HF_TOKEN")  # Hugging Face API token
 HF_API = "https://api-inference.huggingface.co/models/flan-t5-large"
-WIKI_API = "https://en.wikipedia.org/w/api.php"
 
-# ---------------- APP SETUP ----------------
+# ---------------- APP ----------------
 app = Flask(__name__)
 
 SELF_NAME = "MidTechAI"
 OWNER_NAME = "Charles"
 
-# Load or create knowledge
+# Load or create offline knowledge
 if os.path.exists("knowledge.json"):
     with open("knowledge.json", "r") as f:
         knowledge = json.load(f)
@@ -31,6 +30,7 @@ def query_local(question):
     for key, val in knowledge["facts"].items():
         if key in q:
             return val
+    # Self-awareness
     if "your name" in q or "who are you" in q:
         return f"My name is {SELF_NAME}."
     if "my name" in q or "who am i" in q:
@@ -39,33 +39,10 @@ def query_local(question):
         return f"Your owner is {knowledge.get('owner','Unknown')}."
     return None
 
-def query_wikipedia(question):
-    """Search Wikipedia and return top summary"""
-    try:
-        search_params = {
-            "action": "query",
-            "format": "json",
-            "list": "search",
-            "srsearch": question
-        }
-        search_resp = requests.get(WIKI_API, params=search_params).json()
-        results = search_resp.get("query", {}).get("search", [])
-        if not results:
-            return None
-        top_title = results[0]["title"]
-        summary_resp = requests.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{top_title.replace(' ','_')}").json()
-        extract = summary_resp.get("extract")
-        if extract:
-            knowledge["facts"][question.lower()] = extract
-            with open("knowledge.json", "w") as f:
-                json.dump(knowledge, f, indent=2)
-            return extract
-    except:
-        return None
-
-def query_hf(question, context=None):
+def query_flant5(question, context=None):
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": question if not context else context + "\n" + question}
+    prompt = question if not context else context + "\n" + question
+    payload = {"inputs": prompt}
     try:
         resp = requests.post(HF_API, headers=headers, json=payload, timeout=20)
         data = resp.json()
@@ -76,31 +53,28 @@ def query_hf(question, context=None):
     except:
         return None
 
-def get_answer(question):
-    # greetings
+def get_answer(question, memory=[]):
+    # Greetings
     greetings = ["hello","hi","hey","good morning","good evening"]
     if any(g in question.lower() for g in greetings):
         return f"Hello {knowledge.get('owner','User')}! How are you today?"
-    
-    # local knowledge
+
+    # Check offline knowledge
     local = query_local(question)
     if local:
         return local
 
-    # online knowledge
-    wiki_answer = query_wikipedia(question)
-    if wiki_answer:
-        hf_answer = query_hf(question, context=wiki_answer)
-        if hf_answer:
-            return hf_answer
-        return wiki_answer
+    # Reasoning with Flan-T5
+    context = "\n".join(memory) if memory else None
+    answer = query_flant5(question, context)
+    if answer:
+        # Save to knowledge cache
+        knowledge["facts"][question.lower()] = answer
+        with open("knowledge.json","w") as f:
+            json.dump(knowledge, f, indent=2)
+        return answer
 
-    # Flan-T5 fallback
-    hf_answer = query_hf(question)
-    if hf_answer:
-        return hf_answer
-
-    return "I'm not sure yet, but I'm learning more every day!"
+    return "I'm still learning, but I'll get smarter every day!"
 
 # ---------------- ROUTES ----------------
 @app.route("/")
