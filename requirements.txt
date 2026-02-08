@@ -1,3 +1,9 @@
-Flask>=3.1.2
-requests>=2.32.5
-gunicorn>=25.0.2
+Flask>=2.2.5
+requests>=2.31.0
+transformers>=5.1.0
+torch>=2.0.1
+pyttsx3>=2.90
+SpeechRecognition>=3.10
+pydub>=0.25.1
+gTTS>=2.3.2
+flask-cors>=3.0.12
