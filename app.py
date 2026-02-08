@@ -97,7 +97,7 @@ async def get_answer(question, memory=None):
             return hf_answer
         return wiki_answer
 
-    # 4. Flan-T5 fallback
+    # 4. Flan-T5 fallback (reasoning / human-like response)
     context = "\n".join(memory) if memory else None
     hf_answer = await query_hf(question, context=context)
     if hf_answer:
