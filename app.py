@@ -1,108 +1,146 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, render_template, request, jsonify
+import json
 import random
-import os
 import requests
+import os
 
 app = Flask(__name__)
 
-# ================== BOT / OWNER INFO ==================
-BOT_NAME = "MidTechAI"
-OWNER_NAME = "Charles Kanyama"
-FAVORITES = {
-    "color": "black",
-    "game": "Minecraft and eFootball",
-    "sport": "soccer",
-    "team": "Chelsea"
+# -----------------------------
+# Offline Knowledge & Personality
+# -----------------------------
+offline_knowledge = {
+    "assistant_name": "MidTechAI",
+    "creator": "Your Name",
+    "creator_favorites": {
+        "color": "black",
+        "game": ["Minecraft", "eFootball"],
+        "sport": "soccer",
+        "team": "Chelsea"
+    },
+    "greetings": [
+        "Hey there!", "Hi! How’s it going?", "Hello! 😊", "Yo! What's up?"
+    ],
+    "farewells": [
+        "Bye! Take care!", "See you later!", "Catch you soon!", "Goodbye!"
+    ],
+    "comforts": [
+        "I’m here for you.", "Everything will be okay.", "Sending virtual hugs 🤗"
+    ],
+    "apologies": [
+        "Sorry about that.", "My bad!", "I’ll do better next time."
+    ],
+    "appreciations": [
+        "Thanks a lot!", "Much appreciated!", "I’m glad you said that!"
+    ]
 }
 
-# ================== HUGGING FACE SETUP ==================
-HF_TOKEN = os.getenv("HF_TOKEN")
-HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+# -----------------------------
+# Hugging Face API setup
+# -----------------------------
+HF_TOKEN = os.getenv("HF_TOKEN") or "YOUR_HF_TOKEN_HERE"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
+HF_MODEL = "google/flan-t5-small"
 
-
-def ask_huggingface(prompt):
+def humanize_response(text, user_input):
+    payload = {
+        "inputs": f"Explain this to a human in a friendly conversational way:\n{text}\nUser asked: {user_input}",
+        "parameters": {"max_new_tokens": 300}
+    }
     try:
-        payload = {
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 200, "temperature": 0.7},
-        }
-        r = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
-        data = r.json()
-        if isinstance(data, list):
-            return data[0]["generated_text"]
-        return "I’m thinking..."
+        r = requests.post(f"https://api-inference.huggingface.co/models/{HF_MODEL}",
+                          headers=HEADERS, json=payload, timeout=10)
+        if r.status_code == 200:
+            return r.json()[0].get('generated_text', text)
     except:
-        return None
+        pass
+    return text
 
-
-# ================== OFFLINE BRAIN ==================
-def brain(user):
-    u = user.lower()
-
-    greetings = [
-        "Hey there! 😊",
-        "Hello! How can I help you today?",
-        "Hi! I'm here for you.",
-    ]
-
-    jokes = [
-        "Why don’t programmers like nature? Too many bugs.",
-        "Why did the computer get cold? It forgot to close windows.",
-    ]
-
-    comfort = [
-        "I'm really sorry you're feeling that way. I'm here for you.",
-        "That sounds tough. Take a deep breath — you’re not alone.",
-    ]
-
-    # ================== INTENT MATCHING ==================
-    if any(w in u for w in ["hello", "hi", "hey"]):
-        return random.choice(greetings)
-
-    if "your name" in u:
-        return f"My name is {BOT_NAME}."
-
-    if "who created you" in u or "who made you" in u:
-        return f"I was created by {OWNER_NAME}. His favorite color is {FAVORITES['color']} and he loves {FAVORITES['game']}."
-
-    if "joke" in u:
-        return random.choice(jokes)
-
-    if any(w in u for w in ["sad", "tired", "sick", "upset"]):
-        return random.choice(comfort)
-
-    if "favorite" in u and "team" in u:
-        return f"{OWNER_NAME}'s favorite team is {FAVORITES['team']}."
-
-    # Add more offline knowledge here as needed
-
+# -----------------------------
+# Offline Response
+# -----------------------------
+def offline_reply(user_input):
+    lower = user_input.lower()
+    
+    if any(g in lower for g in ["hello", "hi", "hey", "yo"]):
+        return random.choice(offline_knowledge["greetings"])
+    
+    if any(f in lower for f in ["bye", "goodbye", "see you"]):
+        return random.choice(offline_knowledge["farewells"])
+    
+    if any(w in lower for w in ["sad", "tired", "sick", "happy"]):
+        return random.choice(offline_knowledge["comforts"])
+    
+    if "sorry" in lower:
+        return random.choice(offline_knowledge["apologies"])
+    
+    if any(w in lower for w in ["thank", "thanks"]):
+        return random.choice(offline_knowledge["appreciations"])
+    
+    if any(w in lower for w in ["who created you", "who is your creator", "who made you"]):
+        fav = offline_knowledge["creator_favorites"]
+        return f"I was created by {offline_knowledge['creator']}. " \
+               f"They love {fav['color']}, play {', '.join(fav['game'])}, " \
+               f"enjoy {fav['sport']}, and their favorite team is {fav['team']}."
+    
+    if any(w in lower for w in ["your name", "who are you"]):
+        return f"My name is {offline_knowledge['assistant_name']}. I’m your assistant!"
+    
     return None
 
+# -----------------------------
+# Online Search
+# -----------------------------
+def online_search(query):
+    try:
+        wiki_resp = requests.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
+            timeout=3
+        )
+        if wiki_resp.status_code == 200:
+            data = wiki_resp.json()
+            if "extract" in data:
+                return data["extract"]
+    except:
+        pass
+    try:
+        ddg_resp = requests.get(
+            "https://api.duckduckgo.com/",
+            params={"q": query, "format": "json", "no_redirect": 1},
+            timeout=3
+        )
+        data = ddg_resp.json()
+        answer = data.get("AbstractText")
+        if answer:
+            return answer
+    except:
+        pass
+    return None
 
-# ================== ROUTES ==================
+# -----------------------------
+# Routes
+# -----------------------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
+@app.route("/ask", methods=["POST"])
+def ask():
+    user_input = request.json.get("message")
+    
+    reply = offline_reply(user_input)
+    if reply:
+        return jsonify({"reply": reply})
+    
+    search_result = online_search(user_input)
+    if search_result:
+        reply = humanize_response(search_result, user_input)
+        return jsonify({"reply": reply})
+    
+    return jsonify({"reply": "I’m thinking about that… give me a moment."})
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_message = request.json["message"]
-
-    # 1️⃣ Offline brain first
-    reply = brain(user_message)
-
-    # 2️⃣ Online fallback (Flan-T5)
-    if not reply:
-        hf_reply = ask_huggingface(user_message)
-        if hf_reply:
-            reply = hf_reply
-        else:
-            reply = "I’m not sure yet, but I’m learning every day!"
-
-    return jsonify({"reply": reply})
-
-
+# -----------------------------
+# Run App
+# -----------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(debug=True, host="0.0.0.0", port=8080)
