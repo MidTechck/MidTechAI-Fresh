@@ -5,7 +5,7 @@ import requests
 
 app = Flask(__name__)
 
-# ================== OWNER / BOT INFO ==================
+# ================== BOT / OWNER INFO ==================
 BOT_NAME = "MidTechAI"
 OWNER_NAME = "Charles Kanyama"
 FAVORITES = {
@@ -17,7 +17,7 @@ FAVORITES = {
 
 # ================== HUGGING FACE SETUP ==================
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 
@@ -27,7 +27,7 @@ def ask_huggingface(prompt):
             "inputs": prompt,
             "parameters": {"max_new_tokens": 200, "temperature": 0.7},
         }
-        r = requests.post(HF_API_URL, headers=headers, json=payload, timeout=60)
+        r = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
         data = r.json()
         if isinstance(data, list):
             return data[0]["generated_text"]
@@ -56,6 +56,7 @@ def brain(user):
         "That sounds tough. Take a deep breath — you’re not alone.",
     ]
 
+    # ================== INTENT MATCHING ==================
     if any(w in u for w in ["hello", "hi", "hey"]):
         return random.choice(greetings)
 
@@ -74,6 +75,8 @@ def brain(user):
     if "favorite" in u and "team" in u:
         return f"{OWNER_NAME}'s favorite team is {FAVORITES['team']}."
 
+    # Add more offline knowledge here as needed
+
     return None
 
 
@@ -87,10 +90,10 @@ def home():
 def chat():
     user_message = request.json["message"]
 
-    # 1. Try offline brain
+    # 1️⃣ Offline brain first
     reply = brain(user_message)
 
-    # 2. If brain fails, use HuggingFace
+    # 2️⃣ Online fallback (Flan-T5)
     if not reply:
         hf_reply = ask_huggingface(user_message)
         if hf_reply:
